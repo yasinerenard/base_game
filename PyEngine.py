@@ -1,7 +1,7 @@
 import pygame,sys,os,pytmx,math, random
 from pytmx import *
 #from ..Entrainements.gridtmx import *
-
+ 
 entrainementfolder = "Entrainements"
 
 pygame.init()
