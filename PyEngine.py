@@ -157,12 +157,14 @@ class PyObject:
                 screen.blit(scaled_sprite_clip, blit_pos)
 
 class Enemy(PyObject):
+    all = []
     def __init__(self, pos, size, sprites, life, damage, speed, target):
         super().__init__(pos, size, sprites)
         self.life = life
         self.damage = damage
         self.speed = speed
         self.target = target
+        Enemy.all.append(self)
 
     def update(self):
         self.move_to(self.target, self.speed)
@@ -175,8 +177,17 @@ class Enemy(PyObject):
             self.die()
 
     def die(self):
-        print("Enemy has died!")
         PyObject.all.remove(self)
+
+class FastEnemy(Enemy):
+    def __init__(self, pos, size, sprites, life, damage, speed, target):
+        super().__init__(pos, size, sprites, life, damage, speed, target)
+        self.speed *= 2  # Fast enemies move twice as fast
+
+class StrongEnemy(Enemy):
+    def __init__(self, pos, size, sprites, life, damage, speed, target):
+        super().__init__(pos, size, sprites, life, damage, speed, target)
+        self.life *= 3  # Strong enemies have three times the life
 
 class Missile(PyObject):
     all = []
@@ -188,6 +199,8 @@ class Missile(PyObject):
         self.target = target
         self.speed = speed
         self.direction = (pygame.Vector2(target) - pygame.Vector2(pos)).normalize()
+        self.rotation_angle = 90  # Rotate the base sprite by 90 degrees
+        self.look_at(target)  # Make the missile look towards its target
         Missile.all.append(self)
 
     @classmethod
@@ -228,12 +241,39 @@ class Missile(PyObject):
 
     def on_collision(self, enemy):
         enemy.die()
-        PyObject.all.remove(self)
+        if self in PyObject.all : PyObject.all.remove(self)
 
     def check_out_of_bounds(self):
         if (self.pos.x < camera_pos.x - 100 or self.pos.x > camera_pos.x + screen_width + 100 or
                 self.pos.y < camera_pos.y - 100 or self.pos.y > camera_pos.y + screen_height + 100):
             PyObject.all.remove(self)
+
+    def look_at(self, target, offset=0):
+        if not isinstance(target, pygame.Vector2):
+            target = pygame.Vector2(target)
+        direction = target - self.pos - self.size / 2
+        self.rotation_angle = direction.angle_to(pygame.Vector2(1, 0)) + offset
+
+class HomingMissile(Missile):
+    def __init__(self, pos, size, sprites, target, speed=1):
+        super().__init__(pos, size, sprites, target, speed)
+        self.homing_speed = speed / 2  # Homing missiles move slower but adjust direction
+
+    def update(self):
+        self.direction = (pygame.Vector2(self.target) - self.pos).normalize()
+        self.pos += self.direction * self.homing_speed
+        super().update()
+
+class ExplosiveMissile(Missile):
+    def __init__(self, pos, size, sprites, target, speed=1):
+        super().__init__(pos, size, sprites, target, speed)
+        self.explosion_radius = 50  # Explosive missiles have an explosion radius
+
+    def on_collision(self, enemy):
+        for obj in PyObject.all:
+            if isinstance(obj, Enemy) and self.pos.distance_to(obj.pos) <= self.explosion_radius:
+                obj.take_damage(self.damage)
+        PyObject.all.remove(self)
 
 class Explosion(PyObject):
     def __init__(self, pos, size, sprite, duration):
@@ -363,8 +403,13 @@ sprites = spritesheet('walking.png', (0, 0, 1600, 2397), 4, 4)
 spr_hero = spritesheet('walking_mini.png', (0, 0, 64, 96), 4, 4)
 spr_zelda_sword = spritesheet('zelda.png', (112, 268, 75, 17), 1, 5)
 spr_monster1 = spritesheet('plants.png', (1045, 455, 347, 316))
+spr_monster2 = spritesheet('plants.png', (2429, 749, 288, 833))
+spr_monster3 = spritesheet('plants.png', (2049, 825, 317, 348))
 spr_village = spritesheet('village.png', (0, 0, 1600, 1600))
 spr_rocket = spritesheet('guns.png', (951, 811, 39, 10))
+spr_rocket2 = spritesheet('missiles.png', (98, 38, 78, 350))
+spr_rocket2.rotate(90)
+spr_rocket3 = spritesheet('missiles.png', (190, 63, 36, 115))
 spr_explosion = spritesheet('exp.png', 0, 2, 5)
 
 rect2 = PyObject((200, 300), (100, 100), sprites=spr_hero[4:8], animfps=4)
@@ -375,6 +420,12 @@ enemy = Enemy(pos=(100, 100), size=(64, 64), sprites=spr_monster1, life=1, damag
 rocket = Missile(hero.pos, (39, 10), spr_rocket, enemy.pos)
 explosion = PyObject((200, 300), (100, 100), sprites=spr_explosion[0:10], animfps=10)
 sword = Sword(hero, spr_zelda_sword[0], offset=(50, 0))
+
+# Example usage:
+fast_enemy = FastEnemy(pos=(150, 150), size=(64, 64), sprites=spr_monster3, life=1, damage=10, speed=2, target=hero.pos)
+strong_enemy = StrongEnemy(pos=(200, 200), size=(64, 64), sprites=spr_monster2, life=1, damage=10, speed=2, target=hero.pos)
+homing_missile = HomingMissile(hero.pos, (39, 10), spr_rocket, enemy.pos)
+explosive_missile = ExplosiveMissile(hero.pos, (39, 10), spr_rocket, enemy.pos)
 
 font = pygame.font.SysFont(None, 36)
 dragging = False
