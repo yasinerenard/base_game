@@ -526,7 +526,7 @@ def move_pyobject(obj, keys, speed=10):
         obj.set_sprites(sprites[4:8])
     if key_is_triggered(pygame.K_DOWN):
         obj.set_sprites(sprites[0:4])
-
+ 
 camera_pos, camera_zoom = pygame.Vector2(0, 0), 1.0
 sprites = spritesheet('walking.png', (0, 0, 1600, 2397), 4, 4)
 spr_hero = spritesheet('walking_mini.png', (0, 0, 64, 96), 4, 4)
