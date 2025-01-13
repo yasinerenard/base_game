@@ -27,13 +27,7 @@ key_states = {}
 keysa = [getattr(pygame, attr) for attr in dir(pygame) if attr.startswith('K_') and isinstance(getattr(pygame, attr), int)]
 
 def draw_hero_life_bar(screen, hero):
-    life_ratio = hero.life / hero.max_life
-    bar_width = 200
-    bar_height = 20
-    bar_color = (0, 255, 0)
-    pygame.draw.rect(screen, bar_color, (10, 10, bar_width * life_ratio, bar_height))
-    life_text = font.render(f"{hero.life}/{hero.max_life}", True, "black")
-    screen.blit(life_text, (10 + bar_width / 2 - life_text.get_width() / 2, 10 + bar_height / 2 - life_text.get_height() / 2))
+    pass  # Removed life bar drawing code
 
 def debuging():
     explosion.pos = mouse_pos
@@ -172,39 +166,32 @@ class PyObject:
                 else:
                     blit_pos = intersection_rect.topleft
                 screen.blit(scaled_sprite_clip, blit_pos)
-        self.draw_life_bar(screen)
+        self.draw_life_bar(screen, camera_pos, camera_zoom)  # Add life bar drawing call
 
-    def draw_life_bar(self, screen):
-        if hasattr(self, 'life'):
-            life_ratio = self.life / self.max_life
+    def draw_life_bar(self, screen, camera_pos, camera_zoom):
+        if hasattr(self, 'life') and hasattr(self, 'max_life'):
+            life_ratio = max(0, min(1, self.life / self.max_life))  # Ensure life_ratio is between 0 and 1
             bar_width = self.rect.width
             bar_height = 5
             bar_color = (0, 255, 0)
-            pygame.draw.rect(screen, bar_color, (self.rect.left, self.rect.top - bar_height - 2, bar_width * life_ratio, bar_height))
             border_color = (255, 0, 0)
-            pygame.draw.rect(screen, border_color, (self.rect.left, self.rect.top - bar_height - 2, bar_width, bar_height), 1)
+            background_color = (50, 50, 50)
+            # Draw the background bar with rounded corners
+            pygame.draw.rect(screen, background_color, (self.rect.left, self.rect.top - bar_height - 2, bar_width, bar_height), border_radius=3)
+            # Draw the red border bar with rounded corners
+            pygame.draw.rect(screen, border_color, (self.rect.left, self.rect.top - bar_height - 2, bar_width, bar_height), 1, border_radius=3)
+            # Draw the green life bar with rounded corners
+            pygame.draw.rect(screen, bar_color, (self.rect.left, self.rect.top - bar_height - 2, bar_width * life_ratio, bar_height), border_radius=3)
 
 class LifeBar(PyObject):
     def __init__(self, parent, offset=(0, -10), size=(50, 5)):
-        super().__init__(pos=parent.pos + pygame.Vector2(offset), size=size)
-        self.parent = parent
-        self.offset = pygame.Vector2(offset)
-        self.max_life = parent.max_life
-        self.life = parent.life
+        pass  # Removed life bar initialization
 
     def update(self):
-        self.pos = self.parent.pos + self.offset
-        self.life = self.parent.life
-        super().update()
+        pass  # Removed life bar update
 
     def draw(self, screen, camera_pos, camera_zoom):
-        life_ratio = self.life / self.max_life
-        bar_width = self.size.x * life_ratio
-        bar_height = self.size.y
-        bar_color = (0, 255, 0)
-        border_color = (255, 0, 0)
-        pygame.draw.rect(screen, bar_color, (self.pos.x - camera_pos.x, self.pos.y - camera_pos.y, bar_width * camera_zoom, bar_height * camera_zoom))
-        pygame.draw.rect(screen, border_color, (self.pos.x - camera_pos.x, self.pos.y - camera_pos.y, self.size.x * camera_zoom, bar_height * camera_zoom), 1)
+        pass  # Removed life bar drawing
 
 class Enemy(PyObject):
     all = []
@@ -222,11 +209,10 @@ class Enemy(PyObject):
         self.move_to(self.target, self.speed)
         super().update()
         self.rect.topleft = self.pos.x, self.pos.y
-        self.life_bar.update()
 
     def draw(self, screen, camera_pos, camera_zoom):
         super().draw(screen, camera_pos, camera_zoom)
-        self.life_bar.draw(screen, camera_pos, camera_zoom)
+        self.draw_life_bar(screen, camera_pos, camera_zoom)  # Add life bar drawing call
 
     def take_damage(self, amount):
         self.life -= amount
@@ -238,8 +224,6 @@ class Enemy(PyObject):
             PyObject.all.remove(self)
         if self in Enemy.all:
             Enemy.all.remove(self)
-        if self.life_bar in PyObject.all:
-            PyObject.all.remove(self.life_bar)
 
 class FastEnemy(Enemy):
     spawn_rate = 100  # Specific spawn rate for FastEnemy
@@ -309,7 +293,9 @@ class Missile(PyObject):
                 self.on_collision(enemy)
 
     def on_collision(self, enemy):
-        enemy.die()
+        enemy.life -= self.damage
+        if enemy.life < 0:
+            enemy.die()
         if self in PyObject.all : PyObject.all.remove(self)
 
     def check_out_of_bounds(self):
@@ -327,7 +313,7 @@ class HomingMissile(Missile):
     spawn_rate = 150  # Specific spawn rate for HomingMissile
     launch_rate = 60  # Specific launch rate for HomingMissile
 
-    def __init__(self, pos, size, sprites, target, speed=1, damage=10):
+    def __init__(self, pos, size, sprites, target, speed=1, damage=1):
         super().__init__(pos, size, sprites, target, speed, damage)
         self.homing_speed = speed / 2  # Homing missiles move slower but adjust direction
 
@@ -364,15 +350,15 @@ class Explosion(PyObject):
 
 class Gun(PyObject):
     all = []
-    def __init__(self, parent, offset, missile_speed, missile_size, missile_sprites, fire_rate):
+    def __init__(self, parent, offset, missile_speed, missile_size, fire_rate, missile_instance):
         super().__init__(pos=parent.pos + offset, size=(43*3, 26*3), sprites=spr_gun1)
         self.parent = parent
         self.offset = pygame.Vector2(offset)
         self.missile_speed = missile_speed
         self.missile_size = missile_size
-        self.missile_sprites = missile_sprites
         self.fire_rate = fire_rate
         self.fire_counter = 0
+        self.missile_instance = missile_instance  # Add missile_instance attribute
         Gun.all.append(self)
 
     def update(self):
@@ -394,7 +380,7 @@ class Gun(PyObject):
         closest_enemy = Missile.find_closest_enemy(self.pos)
         if closest_enemy:
             direction = (closest_enemy.pos - self.pos).normalize()
-            missile = Missile(self.pos, self.missile_size, self.missile_sprites, closest_enemy.pos, self.missile_speed)
+            missile = self.missile_instance.__class__(self.pos, self.missile_size, self.missile_instance.sprites, closest_enemy.pos, self.missile_speed, self.missile_instance.damage)
             missile.direction = direction
 
     def draw(self, screen, camera_pos, camera_zoom):
@@ -547,24 +533,29 @@ rect4 = PyObject((200, 100), (100, 100), sprites=spr_hero[12:16], animfps=4)
 hero = PyObject((400, 300), (100, 100), sprites=spr_hero[0:4], animfps=4)
 hero.life = 100
 hero.max_life = 100
-enemy = Enemy(pos=(100, 100), size=(64, 64), sprites=spr_monster1, life=1, damage=10, speed=2, target=hero.pos)
-rocket = Missile(hero.pos, (39, 10), spr_rocket, enemy.pos)
+enemy = Enemy(pos=(100, 100), size=(64, 64), sprites=spr_monster1, life=100, damage=10, speed=2, target=hero.pos)
+rocket = Missile(hero.pos, (39, 10), spr_rocket, enemy.pos, damage= 1000)
 rocket.rotate(90)
 explosion = PyObject((200, 300), (100, 100), sprites=spr_explosion[0:10], animfps=10)
 sword = Sword(hero, spr_zelda_sword[0], offset=(50, 0))
 
-fast_enemy = FastEnemy(pos=(150, 150), size=(64, 64), sprites=spr_monster3, life=1, damage=10, speed=2, target=hero.pos)
-strong_enemy = StrongEnemy(pos=(200, 200), size=(64, 64), sprites=spr_monster2, life=1, damage=10, speed=2, target=hero.pos)
+fast_enemy = FastEnemy(pos=(150, 150), size=(64, 64), sprites=spr_monster3, life=100, damage=1, speed=2, target=hero.pos)
+strong_enemy = StrongEnemy(pos=(200, 200), size=(64, 64), sprites=spr_monster2, life=100, damage=1, speed=2, target=hero.pos)
 homing_missile = HomingMissile(hero.pos, (39, 10), spr_rocket2, enemy.pos, damage=10)
-explosive_missile = ExplosiveMissile(hero.pos, (39, 10), spr_rocket3, enemy.pos, damage=10)
+explosive_missile = ExplosiveMissile(hero.pos, (39, 10), spr_rocket3, enemy.pos, damage=100)
 homing_missile.rotate(90)
 explosive_missile.rotate(90)
 
+# Create missile instances with predefined characteristics
+missile1 = Missile(hero.pos, (39, 10), spr_rocket, enemy.pos, speed=10, damage=100)
+missile2 = HomingMissile(hero.pos, (39, 10), spr_rocket2, enemy.pos, speed=10, damage=10)
+missile3 = ExplosiveMissile(hero.pos, (39, 10), spr_rocket3, enemy.pos, speed=10, damage=100)
+
 guns = [
-    Gun(hero, offset=(50, 0), missile_speed=10, missile_size=(39, 10), missile_sprites=spr_rocket, fire_rate=30),
-    Gun(hero, offset=(-50, 0), missile_speed=10, missile_size=(39, 10), missile_sprites=spr_rocket, fire_rate=30),
-    Gun(hero, offset=(0, 50), missile_speed=10, missile_size=(39, 10), missile_sprites=spr_rocket, fire_rate=30),
-    Gun(hero, offset=(0, -50), missile_speed=10, missile_size=(39, 10), missile_sprites=spr_rocket, fire_rate=30)
+    Gun(hero, offset=(50, 0), missile_speed=10, missile_size=(39, 10), fire_rate=30, missile_instance=missile1),
+    Gun(hero, offset=(-50, 0), missile_speed=10, missile_size=(39, 10), fire_rate=30, missile_instance=missile2),
+    Gun(hero, offset=(0, 50), missile_speed=10, missile_size=(39, 10), fire_rate=30, missile_instance=missile3),
+    Gun(hero, offset=(0, -50), missile_speed=10, missile_size=(39, 10), fire_rate=30, missile_instance=missile1)
 ]
 
 font = pygame.font.SysFont(None, 36)
