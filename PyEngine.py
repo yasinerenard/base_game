@@ -232,12 +232,20 @@ class FastEnemy(Enemy):
         super().__init__(pos, size, sprites, life, damage, speed, target)
         self.speed *= 2  # Fast enemies move twice as fast
 
+    @classmethod
+    def set_spawn_rate(cls, rate):
+        cls.spawn_rate = rate
+
 class StrongEnemy(Enemy):
     spawn_rate = 200  # Specific spawn rate for StrongEnemy
 
     def __init__(self, pos, size, sprites, life, damage, speed, target):
         super().__init__(pos, size, sprites, life, damage, speed, target)
         self.life *= 3  # Strong enemies have three times the life
+
+    @classmethod
+    def set_spawn_rate(cls, rate):
+        cls.spawn_rate = rate
 
 class Missile(PyObject):
     all = []
@@ -317,6 +325,10 @@ class HomingMissile(Missile):
         super().__init__(pos, size, sprites, target, speed, damage)
         self.homing_speed = speed / 2  # Homing missiles move slower but adjust direction
 
+    @classmethod
+    def set_spawn_rate(cls, rate):
+        cls.spawn_rate = rate
+
     def update(self):
         self.direction = (pygame.Vector2(self.target) - self.pos).normalize()
         self.pos += self.direction * self.homing_speed
@@ -329,6 +341,10 @@ class ExplosiveMissile(Missile):
     def __init__(self, pos, size, sprites, target, speed=1, damage=10):
         super().__init__(pos, size, sprites, target, speed, damage)
         self.explosion_radius = 50  # Explosive missiles have an explosion radius
+
+    @classmethod
+    def set_spawn_rate(cls, rate):
+        cls.spawn_rate = rate
 
     def on_collision(self, enemy):
         for obj in PyObject.all:
@@ -449,7 +465,9 @@ def spawn_enemy_outside_screen(interval_frames, enemy_sprites, enemy_size, targe
 
 spawn_enemy_outside_screen.counter = 0
 
-def spawn_specific_enemy(enemy_class, enemy_sprites, enemy_size, target, speed, life=100, damage=10):
+def spawn_specific_enemy(enemy_class, enemy_sprites, enemy_size, target, speed, life=100, damage=10, spawn_rate=None):
+    if spawn_rate is not None:
+        enemy_class.set_spawn_rate(spawn_rate)
     if random.randint(1, enemy_class.spawn_rate) == 1:
         screen_margin = 50
         side = random.choice(['top', 'bottom', 'left', 'right'])
@@ -606,8 +624,8 @@ while gamerunning:
         damage=10
     )
 
-    spawn_specific_enemy(FastEnemy, spr_monster3, (64, 64), hero.pos, 2, life=100, damage=10)
-    spawn_specific_enemy(StrongEnemy, spr_monster2, (64, 64), hero.pos, 2, life=100, damage=10)
+    spawn_specific_enemy(FastEnemy, spr_monster3, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=20)
+    spawn_specific_enemy(StrongEnemy, spr_monster2, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=100)
 
 
     screen.fill("black")
