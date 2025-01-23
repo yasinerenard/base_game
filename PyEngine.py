@@ -307,9 +307,9 @@ class Missile(PyObject):
         if self in PyObject.all : PyObject.all.remove(self)
 
     def check_out_of_bounds(self):
-        if (self.pos.x < camera_pos.x - 100 or self.pos.x > camera_pos.x + screen_width + 100 or
-                self.pos.y < camera_pos.y - 100 or self.pos.y > camera_pos.y + screen_height + 100):
-            if self in PyObject.all : PyObject.all.remove(self)
+        if not screenrect.colliderect(self.rect):
+            if self in PyObject.all:
+                PyObject.all.remove(self)
 
     def look_at(self, target, offset=0):
         if not isinstance(target, pygame.Vector2):
@@ -446,26 +446,8 @@ def create_giant_sprite(tmx_data):
                     giant_sprite.blit(tile_image, tile_pos)
     map_pyobject = PyObject(pos=(0, 0), size=giant_sprite.get_size(), sprites=[giant_sprite])
 
-def spawn_enemy_outside_screen(interval_frames, enemy_sprites, enemy_size, target, speed, life=100, damage=10):
-    spawn_enemy_outside_screen.counter += 1
-    if spawn_enemy_outside_screen.counter >= interval_frames:
-        spawn_enemy_outside_screen.counter = 0
-        screen_margin = 50
-        side = random.choice(['top', 'bottom', 'left', 'right'])
-        if side == 'top':
-            pos = pygame.Vector2(random.uniform(-screen_margin, screen_width + screen_margin), -screen_margin)
-        elif side == 'bottom':
-            pos = pygame.Vector2(random.uniform(-screen_margin, screen_width + screen_margin), screen_height + screen_margin)
-        elif side == 'left':
-            pos = pygame.Vector2(-screen_margin, random.uniform(-screen_margin, screen_height + screen_margin))
-        elif side == 'right':
-            pos = pygame.Vector2(screen_width + screen_margin, random.uniform(-screen_margin, screen_height + screen_margin))
-        new_enemy = Enemy(pos=pos, size=enemy_size, sprites=enemy_sprites, life=life, damage=damage, speed=speed, target=target)
-        PyObject.all.append(new_enemy)
 
-spawn_enemy_outside_screen.counter = 0
-
-def spawn_specific_enemy(enemy_class, enemy_sprites, enemy_size, target, speed, life=100, damage=10, spawn_rate=None):
+def spawn_enemy(enemy_class, enemy_sprites, enemy_size, target, speed, life=100, damage=10, spawn_rate=None):
     if spawn_rate is not None:
         enemy_class.set_spawn_rate(spawn_rate)
     if random.randint(1, enemy_class.spawn_rate) == 1:
@@ -580,6 +562,44 @@ font = pygame.font.SysFont(None, 36)
 dragging = False
 rect2.rotate(90)
 
+def convert_to_camera_coordinates(pos, camera_pos, camera_zoom):
+    """
+    Convert a position to camera coordinates based on the camera position and zoom level.
+    
+    :param pos: The original position as a tuple or pygame.Vector2.
+    :param camera_pos: The camera position as a pygame.Vector2.
+    :param camera_zoom: The zoom level of the camera.
+    :return: The converted position as a pygame.Vector2.
+    """
+    if not isinstance(pos, pygame.Vector2):
+        pos = pygame.Vector2(pos)
+    return (pos - camera_pos) * camera_zoom
+
+# Example usage:
+# original_pos = (100, 100)
+# camera_pos = pygame.Vector2(50, 50)
+# camera_zoom = 2.0
+# converted_pos = convert_to_camera_coordinates(original_pos, camera_pos, camera_zoom)
+# print(converted_pos)  # Output will be the position relative to the camera and zoom
+
+def convert_size_to_camera_zoom(size, camera_zoom):
+    """
+    Convert a size to camera zoom level.
+    
+    :param size: The original size as a tuple or pygame.Vector2.
+    :param camera_zoom: The zoom level of the camera.
+    :return: The converted size as a pygame.Vector2.
+    """
+    if not isinstance(size, pygame.Vector2):
+        size = pygame.Vector2(size)
+    return size * camera_zoom
+
+# Example usage:
+# original_size = (100, 100)
+# camera_zoom = 2.0
+# converted_size = convert_size_to_camera_zoom(original_size, camera_zoom)
+# print(converted_size)  # Output will be the size relative to the camera zoom
+
 while gamerunning:
     if key_is_triggered(pygame.K_F1):
         debug = not debug
@@ -601,7 +621,7 @@ while gamerunning:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_1:
                 sword.attack()
-
+    
     keys, _ = check_button_press()
     move_pyobject(hero, keys)
 
@@ -614,19 +634,9 @@ while gamerunning:
     # new_missile = Missile.try_launch_missile(hero.pos, (64, 64), spr_rocket)
     # HomingMissile.try_launch_missile(hero.pos, (39, 10), spr_rocket2)
     # ExplosiveMissile.try_launch_missile(hero.pos, (39, 10), spr_rocket3)
-    spawn_enemy_outside_screen(
-        interval_frames=120,
-        enemy_sprites=spr_monster1,
-        enemy_size=(64, 64),
-        target=hero.pos,
-        speed=2,
-        life=100,
-        damage=10
-    )
 
-    spawn_specific_enemy(FastEnemy, spr_monster3, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=20)
-    spawn_specific_enemy(StrongEnemy, spr_monster2, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=100)
-
+    spawn_enemy(FastEnemy, spr_monster3, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=100)
+    spawn_enemy(StrongEnemy, spr_monster2, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=100)
 
     screen.fill("black")
     for obj in PyObject.all:
@@ -641,7 +651,18 @@ while gamerunning:
         gun.draw(screen, camera_pos, camera_zoom)
 
     draw_hero_life_bar(screen, hero)
+    # Define the red rectangle
+    red_rect_pos = pygame.Vector2(200, 200)
+    red_rect_size = pygame.Vector2(100, 100)
+    red_rect_color = (255, 0, 0, 64)  # Red color with 25% opacity
     
+    # Draw the red rectangle
+    transformed_pos = convert_to_camera_coordinates(red_rect_pos, camera_pos, camera_zoom)
+    transformed_size = convert_size_to_camera_zoom(red_rect_size, camera_zoom)
+    red_rect = pygame.Surface(transformed_size, pygame.SRCALPHA)
+    red_rect.fill(red_rect_color)
+    screen.blit(red_rect, transformed_pos)
+
     fps_text = font.render(f"FPS: {int(clock.get_fps())}", True, "white")
     screen.blit(fps_text, (10, 10))
     if debug: debuging()
