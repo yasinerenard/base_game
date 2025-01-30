@@ -32,11 +32,12 @@ def draw_hero_life_bar(screen, hero):
 def debuging():
     explosion.pos = mouse_pos
     if key_is_triggered(pygame.MOUSEMOTION):
-        enemy = Enemy(pos=mouse_pos, size=(64, 64), sprites=spr_monster1, life=1, damage=10, speed=2, target=hero.pos)
+        _ = Enemy(pos=mouse_pos, size=(64, 64), sprites=spr_monster1, life=1, damage=10, speed=2, target=hero.pos)
     for objects in PyObject.all:
-        temp_surface = pygame.Surface((objects.size), pygame.SRCALPHA)
+        temp_surface = pygame.Surface((objects.rect.width,objects.rect.height), pygame.SRCALPHA)
         temp_surface.fill((0, 0, 255, 128))
         screen.blit(temp_surface, objects.rect[:2])
+    
 
 def update_key_states():
     keys = pygame.key.get_pressed()
@@ -95,6 +96,9 @@ class PyObject:
     @property
     def center(self):
         return self.rect.center
+
+    def constant(self):
+        0
 
     def set_animfps(self, fps):
         self.animfps = fps
@@ -263,17 +267,6 @@ class Missile(PyObject):
         self.look_at(target)  # Make the missile look towards its target
         Missile.all.append(self)
 
-    # Remove automatic missile launching
-    # @classmethod
-    # def try_launch_missile(cls, pos, size, sprites):
-    #     cls.launch_counter += 1
-    #     if cls.launch_counter >= cls.launch_rate:
-    #         cls.launch_counter = 0
-    #         closest_enemy = cls.find_closest_enemy(hero.pos)
-    #         if closest_enemy:
-    #             rocket = cls(pos, size, sprites, closest_enemy.pos)
-    #     return None
-
     @staticmethod
     def find_closest_enemy(hero_pos):
         closest_enemy = None
@@ -401,6 +394,32 @@ class Gun(PyObject):
 
     def draw(self, screen, camera_pos, camera_zoom):
         super().draw(screen, camera_pos, camera_zoom)
+
+class PowerUp(PyObject):
+    def __init__(self, pos, size=(50, 50), sprites=None):
+        super().__init__(pos, size, sprites)
+        self.effect = random.choice(['health', 'speed', 'damage'])
+        self.speed = 0  # Add default speed attribute
+        self.damage = 0  # Add default damage attribute
+
+    def constant(self):
+        temp_surface = pygame.Surface((self.rect.width,self.rect.height), pygame.SRCALPHA)
+        temp_surface.fill((255, 255, 0, 128))
+        screen.blit(temp_surface, self.rect[:2])
+        self.check_collision_with_hero(hero)
+
+    def apply_effect(self, target):
+        if self.effect == 'health':
+            target.life = min(target.max_life, target.life + 20)
+        elif self.effect == 'speed':
+            self.speed += 1
+        elif self.effect == 'damage':
+            self.damage += 5
+        PyObject.all.remove(self)
+
+    def check_collision_with_hero(self, hero):
+        if self.rect.colliderect(hero.rect):
+            self.apply_effect(hero)
 
 def grid(grid_rect, rows=1, cols=1, h_offset=0, v_offset=0):
     cell_width = (grid_rect.width - (cols - 1) * h_offset) / cols
@@ -558,6 +577,12 @@ guns = [
     Gun(hero, offset=(0, -50), missile_speed=10, missile_size=(39, 10), fire_rate=30, missile_instance=missile1)
 ]
 
+# Spawn 10 power-ups on the level
+for _ in range(10):
+    pos = (random.randint(0, screen_width - 50), random.randint(0, screen_height - 50))
+    power_up = PowerUp(pos=pos)
+    PyObject.all.append(power_up)
+
 font = pygame.font.SysFont(None, 36)
 dragging = False
 rect2.rotate(90)
@@ -640,6 +665,7 @@ while gamerunning:
 
     screen.fill("black")
     for obj in PyObject.all:
+        obj.constant()
         obj.update()
         obj.draw(screen, camera_pos, camera_zoom)
 
