@@ -633,6 +633,40 @@ def convert_size_to_camera_zoom(size, camera_zoom):
 show_upgrade_screen = False
 upgrade_buttons = []
 
+class UpgradeButton:
+    def __init__(self, rect, icon_object, title, effect):
+        self.rect = rect
+        self.icon_object = icon_object
+        self.title = title
+        self.effect = effect
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, (255, 255, 255), self.rect)
+        text_surface = font.render(self.title, True, (0, 0, 0))
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        screen.blit(text_surface, text_rect)
+        # Draw icon to the left of the button
+        icon_size = min(self.rect.height, self.rect.width // 4)  # Ensure the icon fits into a square
+        icon_rect = pygame.Rect(self.rect.left - icon_size - 10, self.rect.centery - icon_size // 2, icon_size, icon_size)
+        self.icon_object.rect = icon_rect
+        self.icon_object.update()  # Update the icon object to animate it
+        self.icon_object.draw(screen, pygame.Vector2(0, 0), 1)  # Draw the icon object without camera transformation
+
+    def apply_effect(self, target):
+        self.effect(target)
+
+# Define upgrade effects
+def add_life(target):
+    target.life += 1
+    target.max_life += 1
+
+def add_damage(target):
+    target.damage += 1
+
+def add_speed(target):
+    target.speed += 1
+
+# Initialize upgrade buttons
 def create_upgrade_buttons():
     global upgrade_buttons
     button_width, button_height = 200, 50
@@ -640,30 +674,40 @@ def create_upgrade_buttons():
     button_y_start = (screen_height - 3 * button_height) // 2
     button_gap = 10
     upgrade_buttons = [
-        pygame.Rect(button_x, button_y_start + i * (button_height + button_gap), button_width, button_height)
+        UpgradeButton(pygame.Rect(button_x, button_y_start + i * (button_height + button_gap), button_width, button_height),
+                      icon_objects[i], titles[i], effects[i])
         for i in range(3)
     ]
 
+# Load icons for upgrade buttons from a sprite sheet
+icon_sprites = [
+    sprites,
+    spr_hero,
+    spr_zelda_sword  # Speed icon
+]
+
+# Create PyObject instances for icons
+icon_objects = [
+    PyObject((0, 0), (32, 32), sprites),
+    PyObject((0, 0), (32, 32), spr_hero),
+    PyObject((0, 0), (32, 32), spr_zelda_sword)
+]
+
+titles = ["Add 1 Life", "Add 1 Damage", "Add 1 Speed"]
+effects = [add_life, add_damage, add_speed]
+
+# Initialize upgrade buttons
+create_upgrade_buttons()
+
 def draw_upgrade_screen():
-    #screen.fill((0, 0, 0, 128))  # Semi-transparent black background
-    button_texts = ["Add 1 Life", "Add 1 Damage", "Add 1 Speed"]
-    for i, button in enumerate(upgrade_buttons):
-        pygame.draw.rect(screen, (255, 255, 255), button)
-        text_surface = font.render(button_texts[i], True, (0, 0, 0))
-        text_rect = text_surface.get_rect(center=button.center)
-        screen.blit(text_surface, text_rect)
+    for button in upgrade_buttons:
+        button.draw(screen)
 
 def handle_upgrade_button_click(pos):
     global show_upgrade_screen
-    for i, button in enumerate(upgrade_buttons):
-        if button.collidepoint(pos):
-            if i == 0:
-                hero.life += 1
-                hero.max_life += 1
-            elif i == 1:
-                hero.damage += 1
-            elif i == 2:
-                hero.speed += 1
+    for button in upgrade_buttons:
+        if button.rect.collidepoint(pos):
+            button.apply_effect(hero)
             show_upgrade_screen = False
             break
 
