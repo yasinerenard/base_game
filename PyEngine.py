@@ -91,6 +91,8 @@ class PyObject:
         self.animation_speed = 60 // animfps
         self.current_sprite = self.sprites[self.sprite_index] if sprites else None
         self.rotation_angle = 0
+        self.speed = 0  # Add default speed attribute
+        self.damage = 0  # Add default damage attribute
         PyObject.all.append(self)
 
     @property
@@ -176,7 +178,7 @@ class PyObject:
         if hasattr(self, 'life') and hasattr(self, 'max_life'):
             life_ratio = max(0, min(1, self.life / self.max_life))  # Ensure life_ratio is between 0 and 1
             bar_width = self.rect.width
-            bar_height = 5
+            bar_height = 5 * camera_zoom  # Adjust bar height relative to camera zoom
             bar_color = (0, 255, 0)
             border_color = (255, 0, 0)
             background_color = (50, 50, 50)
@@ -409,6 +411,7 @@ class PowerUp(PyObject):
         self.check_collision_with_hero(hero)
 
     def apply_effect(self, target):
+        global show_upgrade_screen
         if self.effect == 'health':
             target.life = min(target.max_life, target.life + 20)
         elif self.effect == 'speed':
@@ -416,6 +419,7 @@ class PowerUp(PyObject):
         elif self.effect == 'damage':
             self.damage += 5
         PyObject.all.remove(self)
+        show_upgrade_screen = True  # Trigger the upgrade screen
 
     def check_collision_with_hero(self, hero):
         if self.rect.colliderect(hero.rect):
@@ -625,6 +629,47 @@ def convert_size_to_camera_zoom(size, camera_zoom):
 # converted_size = convert_size_to_camera_zoom(original_size, camera_zoom)
 # print(converted_size)  # Output will be the size relative to the camera zoom
 
+# Upgrade screen variables
+show_upgrade_screen = False
+upgrade_buttons = []
+
+def create_upgrade_buttons():
+    global upgrade_buttons
+    button_width, button_height = 200, 50
+    button_x = (screen_width - button_width) // 2
+    button_y_start = (screen_height - 3 * button_height) // 2
+    button_gap = 10
+    upgrade_buttons = [
+        pygame.Rect(button_x, button_y_start + i * (button_height + button_gap), button_width, button_height)
+        for i in range(3)
+    ]
+
+def draw_upgrade_screen():
+    #screen.fill((0, 0, 0, 128))  # Semi-transparent black background
+    button_texts = ["Add 1 Life", "Add 1 Damage", "Add 1 Speed"]
+    for i, button in enumerate(upgrade_buttons):
+        pygame.draw.rect(screen, (255, 255, 255), button)
+        text_surface = font.render(button_texts[i], True, (0, 0, 0))
+        text_rect = text_surface.get_rect(center=button.center)
+        screen.blit(text_surface, text_rect)
+
+def handle_upgrade_button_click(pos):
+    global show_upgrade_screen
+    for i, button in enumerate(upgrade_buttons):
+        if button.collidepoint(pos):
+            if i == 0:
+                hero.life += 1
+                hero.max_life += 1
+            elif i == 1:
+                hero.damage += 1
+            elif i == 2:
+                hero.speed += 1
+            show_upgrade_screen = False
+            break
+
+# Initialize upgrade buttons
+create_upgrade_buttons()
+
 while gamerunning:
     if key_is_triggered(pygame.K_F1):
         debug = not debug
@@ -646,7 +691,17 @@ while gamerunning:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_1:
                 sword.attack()
-    
+            elif event.key == pygame.K_u:
+                show_upgrade_screen = True
+        elif event.type == pygame.MOUSEBUTTONDOWN and show_upgrade_screen:
+            handle_upgrade_button_click(event.pos)
+
+    if show_upgrade_screen:
+        draw_upgrade_screen()
+        pygame.display.flip()
+        clock.tick(FPS)
+        continue
+
     keys, _ = check_button_press()
     move_pyobject(hero, keys)
 
