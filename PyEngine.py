@@ -399,30 +399,29 @@ class Gun(PyObject):
 
 class PowerUp(PyObject):
     def __init__(self, pos, size=(50, 50), sprites=None):
+        sprites = spritesheet('gold_star.png')  # Assign gold star sprite
         super().__init__(pos, size, sprites)
         self.effect = random.choice(['health', 'speed', 'damage'])
-        self.speed = 0  # Add default speed attribute
-        self.damage = 0  # Add default damage attribute
+        self.collected = False  # Add collected flag
 
     def constant(self):
-        temp_surface = pygame.Surface((self.rect.width,self.rect.height), pygame.SRCALPHA)
-        temp_surface.fill((255, 255, 0, 128))
-        screen.blit(temp_surface, self.rect[:2])
-        self.check_collision_with_hero(hero)
+        if not self.collected:
+            self.check_collision_with_hero(hero)  # Check collision only if not collected
 
     def apply_effect(self, target):
         global show_upgrade_screen
         if self.effect == 'health':
             target.life = min(target.max_life, target.life + 20)
         elif self.effect == 'speed':
-            self.speed += 1
+            target.speed += 1
         elif self.effect == 'damage':
-            self.damage += 5
-        PyObject.all.remove(self)
+            target.damage += 5
+        self.collected = True  # Mark as collected
+        PyObject.all.remove(self)  # Directly remove the PowerUp object
         show_upgrade_screen = True  # Trigger the upgrade screen
 
     def check_collision_with_hero(self, hero):
-        if self.rect.colliderect(hero.rect):
+        if not self.collected and self.rect.colliderect(hero.rect):
             self.apply_effect(hero)
 
 def grid(grid_rect, rows=1, cols=1, h_offset=0, v_offset=0):
@@ -585,7 +584,6 @@ guns = [
 for _ in range(10):
     pos = (random.randint(0, screen_width - 50), random.randint(0, screen_height - 50))
     power_up = PowerUp(pos=pos)
-    PyObject.all.append(power_up)
 
 font = pygame.font.SysFont(None, 36)
 dragging = False
