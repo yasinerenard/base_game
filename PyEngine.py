@@ -38,7 +38,6 @@ def debuging():
         temp_surface.fill((0, 0, 255, 128))
         screen.blit(temp_surface, objects.rect[:2])
     # Update screenborderrect position to follow the hero
-    screenborderrect.pos = hero.pos - pygame.Vector2(screen_width / 2, screen_height / 2)
     screenborderrect.draw(screen, camera_pos, camera_zoom)
     screenborderrect.color = (0, 0, 255, 25)  # Blue color with 10% opacity
 
@@ -195,6 +194,11 @@ class PyObject:
             pygame.draw.rect(screen, border_color, (self.rect.left, self.rect.top - bar_height - 2, bar_width, bar_height), 1, border_radius=3)
             # Draw the green life bar with rounded corners
             pygame.draw.rect(screen, bar_color, (self.rect.left, self.rect.top - bar_height - 2, bar_width * life_ratio, bar_height), border_radius=3)
+
+
+# Initialize screenborderrect
+screenborderrect = PyObject((0, 0), (screen_width, screen_height), sprites=None)
+screenborderrect.color = (0, 0, 255, 25)  # Blue color with 10% opacity
 
 class LifeBar(PyObject):
     def __init__(self, parent, offset=(0, -10), size=(50, 5)):
@@ -596,9 +600,6 @@ font = pygame.font.SysFont(None, 36)
 dragging = False
 rect2.rotate(90)
 
-# Initialize screenborderrect
-screenborderrect = PyObject((0, 0), (screen_width, screen_height), sprites=None)
-screenborderrect.color = (0, 0, 255, 25)  # Blue color with 10% opacity
 
 def convert_to_camera_coordinates(pos, camera_pos, camera_zoom):
     """
@@ -762,6 +763,7 @@ while gamerunning:
     rect2.look_at(mouse_pos, -90)
     rect3.move_to(hero.pos, 5)
     camera_pos = hero.pos - pygame.Vector2(screen.get_size()) / 2 / camera_zoom
+    screenborderrect.pos = hero.pos - pygame.Vector2(screen_width / 2, screen_height / 2)
 
     # Remove automatic missile launching
     # new_missile = Missile.try_launch_missile(hero.pos, (64, 64), spr_rocket)
