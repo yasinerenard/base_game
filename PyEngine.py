@@ -17,7 +17,7 @@ pygame.display.set_caption("PYEngine")
 
 # Set up directories and clock
 script_dir = os.path.dirname(os.path.abspath(__file__))
-clock = pygame.time.Clock()
+clock = pygame.Clock()
 FPS = 60
 gamerunning = True
 debug = False
@@ -37,7 +37,10 @@ def debuging():
         temp_surface = pygame.Surface((objects.rect.width,objects.rect.height), pygame.SRCALPHA)
         temp_surface.fill((0, 0, 255, 128))
         screen.blit(temp_surface, objects.rect[:2])
-    
+    # Update screenborderrect position to follow the hero
+    screenborderrect.pos = hero.pos - pygame.Vector2(screen_width / 2, screen_height / 2)
+    screenborderrect.draw(screen, camera_pos, camera_zoom)
+    screenborderrect.color = (0, 0, 255, 25)  # Blue color with 10% opacity
 
 def update_key_states():
     keys = pygame.key.get_pressed()
@@ -172,6 +175,10 @@ class PyObject:
                 else:
                     blit_pos = intersection_rect.topleft
                 screen.blit(scaled_sprite_clip, blit_pos)
+        elif hasattr(self, 'color'):
+            temp_surface = pygame.Surface(transformed_size, pygame.SRCALPHA)
+            temp_surface.fill(self.color)
+            screen.blit(temp_surface, transformed_pos)
         self.draw_life_bar(screen, camera_pos, camera_zoom)  # Add life bar drawing call
 
     def draw_life_bar(self, screen, camera_pos, camera_zoom):
@@ -588,6 +595,10 @@ for _ in range(10):
 font = pygame.font.SysFont(None, 36)
 dragging = False
 rect2.rotate(90)
+
+# Initialize screenborderrect
+screenborderrect = PyObject((0, 0), (screen_width, screen_height), sprites=None)
+screenborderrect.color = (0, 0, 255, 25)  # Blue color with 10% opacity
 
 def convert_to_camera_coordinates(pos, camera_pos, camera_zoom):
     """
