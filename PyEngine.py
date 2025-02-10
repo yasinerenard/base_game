@@ -17,7 +17,7 @@ pygame.display.set_caption("PYEngine")
 
 # Set up directories and clock
 script_dir = os.path.dirname(os.path.abspath(__file__))
-clock = pygame.Clock()
+clock = pygame.time.Clock()
 FPS = 60
 gamerunning = True
 debug = False
@@ -195,6 +195,9 @@ class PyObject:
             # Draw the green life bar with rounded corners
             pygame.draw.rect(screen, bar_color, (self.rect.left, self.rect.top - bar_height - 2, bar_width * life_ratio, bar_height), border_radius=3)
 
+    def die(self):
+        if self in PyObject.all:
+            PyObject.all.remove(self)
 
 # Initialize screenborderrect
 screenborderrect = PyObject((0, 0), (screen_width, screen_height), sprites=None)
@@ -724,6 +727,94 @@ def handle_upgrade_button_click(pos):
 # Initialize upgrade buttons
 create_upgrade_buttons()
 
+class Level:
+    all = []
+    def __init__(self, name, objects, constant_func=None):
+        self.name = name
+        self.objects = objects
+        self.constant_func = constant_func
+        Level.all.append(self)
+
+    def load(self):
+        PyObject.all.extend(self.objects)
+
+    def unload(self):
+        for obj in self.objects:
+            obj.die()
+        PyObject.all = []
+
+    def constant(self):
+        if self.constant_func:
+            self.constant_func()
+
+class LevelManager:
+    def __init__(self):
+        self.levels = {}
+        self.current_level = None
+
+    def add_level(self, level):
+        self.levels[level.name] = level
+
+    def switch_level(self, level_name):
+        if self.current_level:
+            self.current_level.unload()
+        self.current_level = self.levels.get(level_name)
+        if self.current_level:
+            self.current_level.load()
+
+    def update(self):
+        if self.current_level:
+            self.current_level.constant()
+
+# Example usage:
+def level1_constant():
+    print("Level 1 constant function")
+
+def level2_constant():
+    print("Level 2 constant function")
+
+def level3_constant():
+    print("Level 3 constant function")
+
+level1_objects = [
+    PyObject((100, 100), (50, 50), sprites=spr_hero[0:4]),
+    Enemy(pos=(200, 200), size=(64, 64), sprites=spr_monster1, life=100, damage=10, speed=2, target=hero.pos)
+]
+
+level2_objects = [
+    PyObject((300, 300), (50, 50), sprites=spr_hero[4:8]),
+    Enemy(pos=(400, 400), size=(64, 64), sprites=spr_monster2, life=100, damage=10, speed=2, target=hero.pos)
+]
+
+level3_objects = [
+    rect2,
+    rect3,
+    rect4,
+    hero,
+    enemy,
+    rocket,
+    explosion,
+    sword,
+    fast_enemy,
+    strong_enemy,
+    homing_missile,
+    explosive_missile,
+    missile1,
+    missile2,
+    missile3,
+    *guns,
+    *[power_up for power_up in PyObject.all if isinstance(power_up, PowerUp)]
+]
+
+level1 = Level("Level 1", level1_objects, level1_constant)
+level2 = Level("Level 2", level2_objects, level2_constant)
+level3 = Level("Level 3", level3_objects, level3_constant)
+
+level_manager = LevelManager()
+level_manager.add_level(level1)
+level_manager.add_level(level2)
+level_manager.add_level(level3)
+
 while gamerunning:
     if key_is_triggered(pygame.K_F1):
         debug = not debug
@@ -787,7 +878,7 @@ while gamerunning:
         gun.draw(screen, camera_pos, camera_zoom)
 
     draw_hero_life_bar(screen, hero)
-    # Define the red rectangle
+     # Define the red rectangle
     red_rect_pos = pygame.Vector2(200, 200)
     red_rect_size = pygame.Vector2(100, 100)
     red_rect_color = (255, 0, 0, 64)  # Red color with 25% opacity
@@ -805,3 +896,12 @@ while gamerunning:
     
     pygame.display.flip()
     clock.tick(FPS)
+
+    if key_is_triggered(pygame.K_1):
+        level_manager.switch_level("Level 1")
+    elif key_is_triggered(pygame.K_2):
+        level_manager.switch_level("Level 2")
+    elif key_is_triggered(pygame.K_3):
+        level_manager.switch_level("Level 3")
+
+    level_manager.update()
