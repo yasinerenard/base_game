@@ -151,7 +151,7 @@ class PyObject:
         transformed_pos = (self.pos - camera_pos) * camera_zoom
         transformed_size = self.size * camera_zoom
         self.rect = pygame.Rect(transformed_pos, transformed_size)
-        intersection_rect = self.rect.clip(screenrect)
+        intersection_rect = self.rect.clip(screenborderrect)
         if self.current_sprite and intersection_rect.width > 0 and intersection_rect.height > 0:
             if isinstance(self.current_sprite, list):
                 self.current_sprite = self.current_sprite[0]
