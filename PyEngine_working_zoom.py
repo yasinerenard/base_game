@@ -142,41 +142,29 @@ class PyObject:
         self.rotation_angle = direction.angle_to(pygame.Vector2(1, 0)) + offset
 
     def draw(self, screen, camera_pos, camera_zoom):
+        # Calculate the transformed position and size
         transformed_pos = (self.pos - camera_pos) * camera_zoom
         transformed_size = self.size * camera_zoom
         self.rect = pygame.Rect(transformed_pos, transformed_size)
-        #self.rect.topleft = self.pos
-        # Calculate the intersection between the object's rect and the viewport
-        intersection_rect = self.rect.clip(screenrect)
 
-        if self.current_sprite and intersection_rect.width > 0 and intersection_rect.height > 0:
-            # Determine the part of the sprite that should be visible based on the intersection
-            sprite_clip = pygame.Rect(
-                max(0, (intersection_rect.x - transformed_pos.x) / transformed_size.x * self.current_sprite.get_width()),
-                max(0, (intersection_rect.y - transformed_pos.y) / transformed_size.y * self.current_sprite.get_height()),
-                min(self.current_sprite.get_width(), intersection_rect.width / transformed_size.x * self.current_sprite.get_width()),
-                min(self.current_sprite.get_height(), intersection_rect.height / transformed_size.y * self.current_sprite.get_height())
-            )
+        # Perform culling: Skip rendering if the object is outside the screen
+        if not self.rect.colliderect(screenrect):
+            return
 
-            # Ensure the sprite_clip rectangle is within the bounds of the sprite
-            if sprite_clip.width > 0 and sprite_clip.height > 0:
-                sprite_clip.width = min(sprite_clip.width, self.current_sprite.get_width() - sprite_clip.x)
-                sprite_clip.height = min(sprite_clip.height, self.current_sprite.get_height() - sprite_clip.y)
-                # Scale the sprite clip to the size of the intersection
-                scaled_sprite_clip = pygame.transform.scale(
-                    self.current_sprite.subsurface(sprite_clip),
-                    (intersection_rect.width, intersection_rect.height)
-                )
-                
-                # Calculate the position for blitting the clipped sprite
-                if self.rotation_angle!=0:
-                    scaled_sprite_clip = pygame.transform.rotate(scaled_sprite_clip, +self.rotation_angle)  # Rotate in the correct direction
-                    blit_pos = scaled_sprite_clip.get_rect(center=self.rect.center)
-                else:
-                    blit_pos = intersection_rect.topleft
+        # Render the sprite if it exists
+        if self.current_sprite:
+            # Scale the sprite to the transformed size
+            scaled_sprite = pygame.transform.scale(self.current_sprite, (int(transformed_size.x), int(transformed_size.y)))
 
-                screen.blit(scaled_sprite_clip, blit_pos)
-        
+            # Apply rotation if needed
+            if self.rotation_angle != 0:
+                scaled_sprite = pygame.transform.rotate(scaled_sprite, -self.rotation_angle)  # Rotate counter-clockwise
+                blit_pos = scaled_sprite.get_rect(center=self.rect.center)
+            else:
+                blit_pos = self.rect.topleft
+
+            # Blit the sprite onto the screen
+            screen.blit(scaled_sprite, blit_pos)
 
 class Enemy(PyObject):
     def __init__(self, pos, size, sprites, life, damage, speed, target):

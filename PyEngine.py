@@ -17,7 +17,7 @@ pygame.display.set_caption("PYEngine")
 
 # Set up directories and clock
 script_dir = os.path.dirname(os.path.abspath(__file__))
-clock = pygame.time.Clock()
+clock = pygame.time.Clock() # this line must never be changed by chatgpt
 FPS = 60
 gamerunning = True
 debug = False
@@ -37,9 +37,9 @@ def debuging():
         temp_surface = pygame.Surface((objects.rect.width,objects.rect.height), pygame.SRCALPHA)
         temp_surface.fill((0, 0, 255, 128))
         screen.blit(temp_surface, objects.rect[:2])
-    # Update screenborderrect position to follow the hero
-    screenborderrect.draw(screen, camera_pos, camera_zoom)
-    screenborderrect.color = (0, 0, 255, 25)  # Blue color with 10% opacity
+    # Update screenrecttest position to follow the hero
+    screenrecttest.draw(screen, camera_pos, camera_zoom)
+    screenrecttest.color = (0, 0, 255, 25)  # Blue color with 10% opacity
 
 def update_key_states():
     keys = pygame.key.get_pressed()
@@ -86,15 +86,15 @@ class PyObject:
         self.size = pygame.Vector2(size)
         self.original_size = pygame.Vector2(size)
         self.rect = pygame.Rect(self.pos, self.size)
-        self.sprites = sprites if isinstance(sprites, list) else [sprites]
+        self.sprites = sprites if isinstance(sprites, list) else [sprites]  # Ensure sprites is always a list
         self.animfps = animfps
         self.sprite_index = 0
         self.frame_count = 0
         self.animation_speed = 60 // animfps
-        self.current_sprite = self.sprites[self.sprite_index] if sprites else None
+        self.current_sprite = self.sprites[self.sprite_index] if self.sprites else None  # Set the first sprite
         self.rotation_angle = 0
-        self.speed = 0  # Add default speed attribute
-        self.damage = 0  # Add default damage attribute
+        self.speed = 0
+        self.damage = 0
         PyObject.all.append(self)
 
     @property
@@ -109,10 +109,10 @@ class PyObject:
         self.animation_speed = 60 // fps
     
     def set_sprites(self, new_sprites, animfps=None):
-        self.sprites = new_sprites if isinstance(new_sprites, list) else [new_sprites]
+        self.sprites = new_sprites if isinstance(new_sprites, list) else [new_sprites]  # Ensure sprites is a list
         self.sprite_index = 0
         self.frame_count = 0
-        self.current_sprite = self.sprites[self.sprite_index]
+        self.current_sprite = self.sprites[self.sprite_index] if self.sprites else None  # Update current sprite
         if animfps:
             self.set_animfps(animfps)
 
@@ -148,37 +148,34 @@ class PyObject:
         self.rotation_angle = direction.angle_to(pygame.Vector2(1, 0)) + offset
 
     def draw(self, screen, camera_pos, camera_zoom):
+        # Calculate the transformed position and size
         transformed_pos = (self.pos - camera_pos) * camera_zoom
         transformed_size = self.size * camera_zoom
         self.rect = pygame.Rect(transformed_pos, transformed_size)
-        intersection_rect = self.rect.clip(screenborderrect)
-        if self.current_sprite and intersection_rect.width > 0 and intersection_rect.height > 0:
-            if isinstance(self.current_sprite, list):
-                self.current_sprite = self.current_sprite[0]
-            sprite_clip = pygame.Rect(
-                max(0, (intersection_rect.x - transformed_pos.x) / transformed_size.x * self.current_sprite.get_width()),
-                max(0, (intersection_rect.y - transformed_pos.y) / transformed_size.y * self.current_sprite.get_height()),
-                min(self.current_sprite.get_width(), intersection_rect.width / transformed_size.x * self.current_sprite.get_width()),
-                min(self.current_sprite.get_height(), intersection_rect.height / transformed_size.y * self.current_sprite.get_height())
-            )
-            if sprite_clip.width > 0 and sprite_clip.height > 0:
-                sprite_clip.width = min(sprite_clip.width, self.current_sprite.get_width() - sprite_clip.x)
-                sprite_clip.height = min(sprite_clip.height, self.current_sprite.get_height() - sprite_clip.y)
-                scaled_sprite_clip = pygame.transform.scale(
-                    self.current_sprite.subsurface(sprite_clip),
-                    (intersection_rect.width, intersection_rect.height)
-                )
-                if self.rotation_angle != 0:
-                    scaled_sprite_clip = pygame.transform.rotate(scaled_sprite_clip, +self.rotation_angle)
-                    blit_pos = scaled_sprite_clip.get_rect(center=self.rect.center)
-                else:
-                    blit_pos = intersection_rect.topleft
-                screen.blit(scaled_sprite_clip, blit_pos)
-        elif hasattr(self, 'color'):
+
+        # Perform culling: Skip rendering if the object is completely outside the screen
+        if not self.rect.colliderect(screenrect):
+            return
+
+        # Render the sprite if it exists
+        if isinstance(self.current_sprite, pygame.Surface):  # Ensure current_sprite is a Surface
+            # Scale the sprite to the transformed size
+            scaled_sprite = pygame.transform.scale(self.current_sprite, (int(transformed_size.x), int(transformed_size.y)))
+
+            # Apply clipping to render only the visible part of the sprite
+            clip_rect = self.rect.clip(screenrecttest)  # Get the intersection of the sprite rect and the screen rect
+            if clip_rect.width > 0 and clip_rect.height > 0:  # Ensure there's something to render
+                # Calculate the offset within the scaled sprite for clipping
+                clip_offset_x = clip_rect.x - self.rect.x
+                clip_offset_y = clip_rect.y - self.rect.y
+                clipped_sprite = scaled_sprite.subsurface(pygame.Rect(clip_offset_x, clip_offset_y, clip_rect.width, clip_rect.height))
+
+                # Blit the clipped sprite onto the screen
+                screen.blit(clipped_sprite, clip_rect.topleft)
+        elif hasattr(self, 'color'):  # Render colored objects if no sprite exists
             temp_surface = pygame.Surface(transformed_size, pygame.SRCALPHA)
             temp_surface.fill(self.color)
             screen.blit(temp_surface, transformed_pos)
-        self.draw_life_bar(screen, camera_pos, camera_zoom)  # Add life bar drawing call
 
     def draw_life_bar(self, screen, camera_pos, camera_zoom):
         if hasattr(self, 'life') and hasattr(self, 'max_life'):
@@ -199,9 +196,9 @@ class PyObject:
         if self in PyObject.all:
             PyObject.all.remove(self)
 
-# Initialize screenborderrect
-screenborderrect = PyObject((0, 0), (screen_width, screen_height), sprites=None)
-screenborderrect.color = (0, 0, 255, 25)  # Blue color with 10% opacity
+# Initialize screenrecttest
+screenrecttest = PyObject((0, 0), (screen_width, screen_height), sprites=None)
+screenrecttest.color = (0, 0, 255, 25)  # Blue color with 10% opacity
 
 class LifeBar(PyObject):
     def __init__(self, parent, offset=(0, -10), size=(50, 5)):
@@ -319,6 +316,7 @@ class Missile(PyObject):
         if not screenrect.colliderect(self.rect):
             if self in PyObject.all:
                 PyObject.all.remove(self)
+                Missile.all.remove(self)
 
     def look_at(self, target, offset=0):
         if not isinstance(target, pygame.Vector2):
@@ -854,49 +852,47 @@ while gamerunning:
     rect2.look_at(mouse_pos, -90)
     rect3.move_to(hero.pos, 5)
     camera_pos = hero.pos - pygame.Vector2(screen.get_size()) / 2 / camera_zoom
-    screenborderrect.pos = hero.pos - pygame.Vector2(screen_width / 2, screen_height / 2)
+    screenrecttest.pos = hero.pos - pygame.Vector2(screen_width / 2, screen_height / 2)
 
-    # Remove automatic missile launching
-    # new_missile = Missile.try_launch_missile(hero.pos, (64, 64), spr_rocket)
-    # HomingMissile.try_launch_missile(hero.pos, (39, 10), spr_rocket2)
-    # ExplosiveMissile.try_launch_missile(hero.pos, (39, 10), spr_rocket3)
+    # Spawn enemies
+    #spawn_enemy(FastEnemy, spr_monster3, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=100)
+    #spawn_enemy(StrongEnemy, spr_monster2, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=100)
 
-    spawn_enemy(FastEnemy, spr_monster3, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=100)
-    spawn_enemy(StrongEnemy, spr_monster2, (64, 64), hero.pos, 2, life=100, damage=10, spawn_rate=100)
-
+    # Clear the screen
     screen.fill("black")
-    for obj in PyObject.all:
-        obj.constant()
-        obj.update()
-        obj.draw(screen, camera_pos, camera_zoom)
 
+    # Update and draw only visible objects
+    for obj in PyObject.all:
+        if obj.rect.colliderect(screenrect):  # Only update and draw visible objects
+            obj.constant()
+            obj.update()
+            obj.draw(screen, camera_pos, camera_zoom)
+
+    # Update and draw the sword
     sword.update()
     sword.draw(screen, camera_pos, camera_zoom)
 
+    # Update and draw guns
     for gun in Gun.all:
         gun.update()
         gun.draw(screen, camera_pos, camera_zoom)
 
+    # Draw hero life bar
     draw_hero_life_bar(screen, hero)
-     # Define the red rectangle
-    red_rect_pos = pygame.Vector2(200, 200)
-    red_rect_size = pygame.Vector2(100, 100)
-    red_rect_color = (255, 0, 0, 64)  # Red color with 25% opacity
-    
-    # Draw the red rectangle
-    transformed_pos = convert_to_camera_coordinates(red_rect_pos, camera_pos, camera_zoom)
-    transformed_size = convert_size_to_camera_zoom(red_rect_size, camera_zoom)
-    red_rect = pygame.Surface(transformed_size, pygame.SRCALPHA)
-    red_rect.fill(red_rect_color)
-    screen.blit(red_rect, transformed_pos)
 
+    # Draw FPS
     fps_text = font.render(f"FPS: {int(clock.get_fps())}", True, "white")
     screen.blit(fps_text, (10, 10))
-    if debug: debuging()
-    
+
+    # Debugging overlay
+    if debug:
+        debuging()
+
+    # Update the display
     pygame.display.flip()
     clock.tick(FPS)
 
+    # Handle level switching
     if key_is_triggered(pygame.K_1):
         level_manager.switch_level("Level 1")
     elif key_is_triggered(pygame.K_2):
@@ -904,4 +900,6 @@ while gamerunning:
     elif key_is_triggered(pygame.K_3):
         level_manager.switch_level("Level 3")
 
+    # Update the current level
     level_manager.update()
+    print(screenrect)
